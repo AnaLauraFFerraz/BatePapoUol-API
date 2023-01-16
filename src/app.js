@@ -67,16 +67,17 @@ app.post("/participants", async (req, res) => {
 
 app.get("/participants", async (req, res) => {
     try {
-        let activeParticipants = await db.collection("participants").find().toArray()
-        res.send(activeParticipants)
+        let activeParticipants = await db.collection("participants").find().toArray();
+        res.status(200).send(activeParticipants);
     } catch {
-        res.status(500).send("Erro ao buscar participantes")
+        res.sendStatus(500);
     }
 })
 
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
     const from = req.headers.user;
+    console.log(from);
 
     const time = dayjs(Date.now()).format("hh:mm:ss");
 
@@ -86,16 +87,19 @@ app.post("/messages", async (req, res) => {
         type: joi.string().valid("private_message", "message").required()
     })
 
-    const messageValidation = messageSchema.validate({ to, text, type });
+    const validation = messageSchema.validate({ to, text, type });
 
-    if (messageValidation.error) {
-        return res.status(422).send(messageValidation.error.details);
+    if (validation.error) {
+        return res.sendStatus(422);
     }
 
     try {
-        await db.collection("participants").findOne({ name: from })
+        const isUser = await db.collection("participants").findOne({ name: from })
+        if (!isUser) {
+            return res.sendStatus(422);
+        }
     } catch {
-        res.status(422).send("Usuário não encontrado")
+        return res.sendStatus(422);
     }
 
     try {
@@ -106,15 +110,15 @@ app.post("/messages", async (req, res) => {
             from,
             time,
         });
-        res.status(201)
+        res.status(201);
     } catch {
-        res.status(500)
+        res.status(500);
     }
 });
 
 app.get("/messages", async (req, res) => {
     const { user } = req.headers;
-    let allMessages
+    let allMessages;
     let limit;
 
     try {
@@ -129,6 +133,8 @@ app.get("/messages", async (req, res) => {
         if (limit < 1 || isNaN(limit)) {
             return res.status(422).send("Limite inválido")
         }
+    } else {
+        limit = 100;
     }
 
     let userMessages = allMessages.filter((message) =>
@@ -139,7 +145,7 @@ app.get("/messages", async (req, res) => {
         message.type === "status"
     );
 
-    const limitedMessages = userMessages.splice(-limit).reverse()
+    const limitedMessages = userMessages.slice(limit)
     res.send(limitedMessages)
 })
 
@@ -156,27 +162,31 @@ app.post("/status", async (req, res) => {
     const participantStatus = { name: user, lastStatus: time };
 
     try {
-        await db.collection("participants").updateOne({ name: user }, { $set: participantStatus })
-        res.status(200).send("Participante atualizado com sucesso")
+        await db.collection("participants").updateOne({ name: user }, { $set: participantStatus });
+        res.sendStatus(200);
     } catch {
-        res.status(422).send("Usuário não encontrado")
+        res.sendStatus(422);
     }
 })
 
 setInterval(
-    async function removeUser() {
-        const timeStatus = Date.now();
+    async () => {
+        const now = Date.now();
         const time = dayjs(Date.now()).format("hh:mm:ss");
 
         const inactiveUsers = await db.collection("participants").find({
-            lastStatus: { $lt: timeStatus - 10000 }
+            lastStatus: { $lt: now - 10000 }
         }).toArray();
 
         inactiveUsers.forEach(async (user) => {
-            await db.collection("participants")
-                .deleteOne({ name: user.name });
-            await db.collection("messages")
-                .insertOne({ from: user.name, to: "Todos", text: "sai da sala...", type: "status", time: time, });
+            await db.collection("participants").deleteOne({ name: user.name });
+            await db.collection("messages").insertOne({
+                    from: user.name,
+                    to: "Todos",
+                    text: "sai da sala...",
+                    type: "status",
+                    time: time
+                });
         })
     }, 15000)
 
