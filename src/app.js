@@ -114,3 +114,34 @@ app.post("/messages", async (req, res) => {
     }
 });
 
+app.get("/messages", async (req, res) => {
+    const { user } = req.headers;
+
+    try {
+        const allMessages = await db.collection("messages").find().toArray();
+    } catch {
+        res.status(422).send("Erro ao buscar mensagens")
+    }
+
+    let limit;
+
+    if (req.query.limit) {
+        limit = parseInt(req.query.limit);
+
+        if (limit < 1 || isNaN(limit)) {
+            return res.status(422).send("Limite inválido")
+        }
+    }
+
+    let userMessages = allMessages.filter((message) =>
+        message.user === user ||
+        message.from === user ||
+        message.to === "Todos" ||
+        message.to === user ||
+        message.type === "status"
+    );
+
+    const limitedMessages = userMessages.splice(-limit).reverse()
+    res.send(limitedMessages)
+})
+
