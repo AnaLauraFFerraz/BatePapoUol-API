@@ -14,13 +14,11 @@ app.use(cors());
 const date = dayjs().format("hh:mm:ss")
 
 const PORT = 5000;
-app.listen(5000);
 
 const mongoClient = new MongoClient(process.env.DATABASE_URL);
 
 try {
     await mongoClient.connect();
-    console.log("Connected to Mongo");
 } catch (err) {
     console.log("Erro ao conectar com o mongo", err.message);
 }
@@ -29,43 +27,41 @@ const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
-    let checkUsername;
 
     const usernameSchema = joi.object({
         name: joi.string().required()
     });
 
-    const usernameValidation = usernameSchema.validate({ name });
+    const validation = usernameSchema.validate({ name });
 
-    if (usernameValidation.error) {
-        return res.status(422).send(usernameValidation.error.details);
+    if (validation.error) {
+        return res.sendStatus(422);
     }
 
     try {
-        checkUsername = await db.collection("participants").findOne({ name });
-    } catch {
-        checkUsername = false;
-        console.log("Erro na validação do nome do usuário")
-    }
+        const isUserActive = await db.collection("participants").findOne({ name });
+        if (isUserActive) {
+            return res.sendStatus(409);
+        }
 
-    if (checkUsername) {
-        return res.status(409).send("Esse nome de usuário já está sendo utilizado.");
-    }
+        const participants = {
+            name: name,
+            lastStatus: Date.now()
+        };
+        await db.collection("participants").insertOne(participants);
 
-    try {
-        const participant = { name, lastStatus: Date.now() };
-
-        await db.collection("participants").insertOne(participant);
-        await db.collection("messages").insertOne({
+        const message = {
             from: name,
             to: "Todos",
             text: "entra na sala...",
             type: "status",
             time: date,
-        });
-        res.status(201)
+        };
+        await db.collection("messages").insertOne(message);
+
+        res.sendStatus(201);
     } catch {
-        console.log("Erro ao cadastrar usuário")
+        res.sendStatus(500);
     }
 })
 
@@ -118,14 +114,14 @@ app.post("/messages", async (req, res) => {
 
 app.get("/messages", async (req, res) => {
     const { user } = req.headers;
+    let allMessages
+    let limit;
 
     try {
-        const allMessages = await db.collection("messages").find().toArray();
+        allMessages = await db.collection("messages").find().toArray();
     } catch {
         res.status(422).send("Erro ao buscar mensagens")
     }
-
-    let limit;
 
     if (req.query.limit) {
         limit = parseInt(req.query.limit);
@@ -183,4 +179,5 @@ setInterval(
                 .insertOne({ from: user.name, to: "Todos", text: "sai da sala...", type: "status", time: time, });
         })
     }, 15000)
-    
+
+app.listen(PORT);
