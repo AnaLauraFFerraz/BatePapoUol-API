@@ -66,3 +66,12 @@ app.post("/participants", async (req, res) => {
         console.log("Erro ao cadastrar usuário")
     }
 })
+
+app.get("/participants", async (req, res) => {
+    try {
+        let activeParticipants = await db.collection("participants").find().toArray()
+        res.send(activeParticipants)
+    } catch {
+        res.status(500).send("Erro ao buscar participantes")
+    }
+})
