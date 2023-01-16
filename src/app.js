@@ -145,3 +145,23 @@ app.get("/messages", async (req, res) => {
     res.send(limitedMessages)
 })
 
+app.post("/status", async (req, res) => {
+    const { user } = req.headers;
+    const time = Date.now();
+
+    try {
+        await db.collection("participants").findOne({ name: user });
+    } catch {
+        return res.status(404).send("Usuário não encontrado");
+    }
+
+    const participantStatus = { name: user, lastStatus: time };
+
+    try {
+        await db.collection("participants").updateOne({ name: user }, { $set: participantStatus })
+        res.status(200).send("Participante atualizado com sucesso")
+    } catch {
+        res.status(422).send("Usuário não encontrado")
+    }
+})
+
