@@ -150,7 +150,7 @@ app.get("/messages", async (req, res) => {
 })
 
 app.post("/status", async (req, res) => {
-    const { user } = req.headers;
+    const user = req.headers.user;
     const time = Date.now();
 
     try {
@@ -165,7 +165,7 @@ app.post("/status", async (req, res) => {
         await db.collection("participants").updateOne({ name: user }, { $set: participantStatus });
         res.sendStatus(200);
     } catch {
-        res.sendStatus(422);
+        res.sendStatus(500);
     }
 })
 
@@ -181,13 +181,33 @@ setInterval(
         inactiveUsers.forEach(async (user) => {
             await db.collection("participants").deleteOne({ name: user.name });
             await db.collection("messages").insertOne({
-                    from: user.name,
-                    to: "Todos",
-                    text: "sai da sala...",
-                    type: "status",
-                    time: time
-                });
+                from: user.name,
+                to: "Todos",
+                text: "sai da sala...",
+                type: "status",
+                time: time
+            });
         })
     }, 15000)
 
+app.delete("/messages/:id", async (req, res) => {
+    const { id } = req.params;
+    const name = req.headers.user;
+
+    try {
+        const message = await db.collection("messages").findOne({ _id: ObjectId(id) });
+
+        if (!message) return res.sendStatus(404);
+
+        if (message.from !== name) return res.sendStatus(401);
+
+        await db.collection("messages").deleteOne({ _id: ObjectId(id) });
+
+        res.sendStatus(200);
+    } catch {
+        res.sendStatus(500);
+    }
+});
+
 app.listen(PORT);
+
