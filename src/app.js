@@ -20,10 +20,12 @@ const mongoClient = new MongoClient(process.env.DATABASE_URL);
 
 try {
     await mongoClient.connect();
-    const db = mongoClient.db();
+    console.log("Connected to Mongo");
 } catch (err) {
-    console.log(err.message);
+    console.log("Erro ao conectar com o mongo", err.message);
 }
+
+const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
@@ -165,3 +167,20 @@ app.post("/status", async (req, res) => {
     }
 })
 
+setInterval(
+    async function removeUser() {
+        const timeStatus = Date.now();
+        const time = dayjs(Date.now()).format("hh:mm:ss");
+
+        const inactiveUsers = await db.collection("participants").find({
+            lastStatus: { $lt: timeStatus - 10000 }
+        }).toArray();
+
+        inactiveUsers.forEach(async (user) => {
+            await db.collection("participants")
+                .deleteOne({ name: user.name });
+            await db.collection("messages")
+                .insertOne({ from: user.name, to: "Todos", text: "sai da sala...", type: "status", time: time, });
+        })
+    }, 15000)
+    
