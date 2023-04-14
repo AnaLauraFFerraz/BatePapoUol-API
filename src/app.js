@@ -4,7 +4,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from 'joi';
 import dayjs from "dayjs";
-import stripHtml from "string-strip-html";
+import { stripHtml } from "string-strip-html";
 
 dotenv.config();
 
