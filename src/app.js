@@ -26,7 +26,6 @@ try {
 
 const db = mongoClient.db();
 
-// Retorna 422 ao fazer request inválido?
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
 
@@ -78,8 +77,6 @@ app.get("/participants", async (req, res) => {
     }
 })
 
-// Retorna status code 422 caso campo "to" não seja válido?
-// Retorna status code 422 caso campo "text" não seja válido?
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
     const from = req.headers.user;
@@ -174,34 +171,47 @@ app.post("/status", async (req, res) => {
 
 app.put("/messages/:id", async (req, res) => {
     const { id } = req.params;
-    const from = req.headers.user;
     const { to, text, type } = req.body;
-    const time = dayjs(Date.now()).format("hh:mm:ss");
+    const from = req.headers.user;
+
+    const sanitized_to = stripHtml(to).result.trim();
+    const sanitized_text = stripHtml(text).result.trim();
 
     const messageSchema = joi.object({
-        to: joi.string().required(),
-        text: joi.string().required(),
-        type: joi.string().valid("private_message", "message").required()
-    })
+        to: joi.string().min(1).required(),
+        text: joi.string().min(1).required(),
+        type: joi.string().valid("message", "private_message").required()
+    });
 
-    const validation = messageSchema.validate({ to, text, type });
+    const validation = messageSchema.validate({ to: sanitized_to, text: sanitized_text, type });
 
-    if (validation.error) return res.sendStatus(422);
+    if (validation.error) {
+        return res.sendStatus(422);
+    }
+
+    try {
+        const isUser = await db.collection("participants").findOne({ name: from })
+        if (!isUser) {
+            return res.sendStatus(422);
+        }
+    } catch {
+        return res.sendStatus(500);
+    }
 
     try {
         const message = await db.collection("messages").findOne({ _id: ObjectId(id) });
-
-        if (message.from !== from) return res.sendStatus(401);
+        if (!message) {
+            return res.sendStatus(404);
+        }
+        if (message.from !== from) {
+            return res.sendStatus(401);
+        }
 
         await db.collection("messages").updateOne(
-            { _id: ObjectId(id) }, {
-            $set: {
-                text,
-                time
-            },
-        }
+            { _id: ObjectId(id) },
+            { $set: { to: sanitized_to, text: sanitized_text, type } }
         );
-        res.sendStatus(201);
+        res.sendStatus(200);
     } catch {
         res.sendStatus(500);
     }
