@@ -28,7 +28,7 @@ const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
-    if (!name) return res.sendStatus(422)
+    if (!name || typeof name !== "string") return res.sendStatus(422)
 
     const sanitized_name = stripHtml(name).result;
 
