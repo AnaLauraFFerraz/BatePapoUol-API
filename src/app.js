@@ -104,7 +104,7 @@ app.post("/messages", async (req, res) => {
     try {
         const isUser = await db.collection("participants").findOne({ name: from })
         if (!isUser) {
-            return res.sendStatus(422);
+            return res.sendStatus(404);
         }
     } catch {
         return res.sendStatus(500);
