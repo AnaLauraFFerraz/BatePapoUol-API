@@ -29,16 +29,17 @@ const db = mongoClient.db();
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
 
-    const sanitized_name = stripHtml(name).result.trim();
+    const sanitized_name = stripHtml(name).result;
 
     const usernameSchema = joi.object({
-        name: joi.string().min(1).required()
+        name: joi.string().min(1).trim().required()
     });
 
-    const validation = usernameSchema.validate({ name: sanitized_name });
+    const validation = usernameSchema.validate({ name: sanitized_name }, { abortEarly: false });
 
     if (validation.error) {
-        return res.sendStatus(422);
+        const errors = validation.error.details.map(detail => detail.message);
+        return res.status(422).send(errors);
     }
 
     try {
@@ -81,14 +82,14 @@ app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
     const from = req.headers.user;
 
-    const sanitized_to = stripHtml(to).result.trim();
-    const sanitized_text = stripHtml(text).result.trim();
+    const sanitized_to = stripHtml(to).result;
+    const sanitized_text = stripHtml(text).result;
 
     const time = dayjs(Date.now()).format("hh:mm:ss");
 
     const messageSchema = joi.object({
-        to: joi.string().min(1).required(),
-        text: joi.string().min(1).required(),
+        to: joi.string().min(1).trim().required(),
+        text: joi.string().min(1).trim().required(),
         type: joi.string().valid("private_message", "message").required()
     })
 
@@ -101,7 +102,7 @@ app.post("/messages", async (req, res) => {
     try {
         const isUser = await db.collection("participants").findOne({ name: from })
         if (!isUser) {
-            return res.sendStatus(404);
+            return res.sendStatus(422);
         }
     } catch {
         return res.sendStatus(500);
