@@ -28,6 +28,7 @@ const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
+    if (!name) return res.sendStatus(422)
 
     const sanitized_name = stripHtml(name).result;
 
@@ -81,6 +82,7 @@ app.get("/participants", async (req, res) => {
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
     const from = req.headers.user;
+    if (!to || !text || !type || !from) return res.sendStatus(422)
 
     const sanitized_to = stripHtml(to).result;
     const sanitized_text = stripHtml(text).result;
@@ -181,6 +183,8 @@ app.put("/messages/:id", async (req, res) => {
     const { id } = req.params;
     const { to, text, type } = req.body;
     const from = req.headers.user;
+    if (!id || !to || !text || !type || !from) return res.sendStatus(422)
+
 
     const sanitized_to = stripHtml(to).result;
     const sanitized_text = stripHtml(text).result;
