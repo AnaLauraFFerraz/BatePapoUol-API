@@ -39,7 +39,7 @@ app.post("/participants", async (req, res) => {
 
     if (validation.error) {
         const errors = validation.error.details.map(detail => detail.message);
-        return res.status(422).send(errors);
+        return res.status(422).send({ errors });
     }
 
     try {
@@ -96,7 +96,8 @@ app.post("/messages", async (req, res) => {
     const validation = messageSchema.validate({ to: sanitized_to, text: sanitized_text, type });
 
     if (validation.error) {
-        return res.sendStatus(422);
+        const errors = validation.error.details.map(detail => detail.message);
+        return res.status(422).send({ errors });
     }
 
     try {
@@ -154,6 +155,12 @@ app.post("/status", async (req, res) => {
     const { user } = req.headers;
 
     try {
+        const existingUser = await db.collection("participants").findOne({ name: user });
+
+        if (!existingUser) {
+            return res.sendStatus(404);
+        }
+
         const updatedParticipant = await db.collection("participants").findOneAndUpdate(
             { name: user },
             { $set: { lastStatus: Date.now() } },
@@ -175,19 +182,20 @@ app.put("/messages/:id", async (req, res) => {
     const { to, text, type } = req.body;
     const from = req.headers.user;
 
-    const sanitized_to = stripHtml(to).result.trim();
-    const sanitized_text = stripHtml(text).result.trim();
+    const sanitized_to = stripHtml(to).result;
+    const sanitized_text = stripHtml(text).result;
 
     const messageSchema = joi.object({
-        to: joi.string().min(1).required(),
-        text: joi.string().min(1).required(),
+        to: joi.string().min(1).trim().required(),
+        text: joi.string().min(1).trim().required(),
         type: joi.string().valid("message", "private_message").required()
     });
 
     const validation = messageSchema.validate({ to: sanitized_to, text: sanitized_text, type });
 
     if (validation.error) {
-        return res.sendStatus(422);
+        const errors = validation.error.details.map(detail => detail.message);
+        return res.status(422).send({ errors });
     }
 
     try {
